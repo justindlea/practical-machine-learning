@@ -1,0 +1,68 @@
+---
+title: "Practical Machine Learning Project"
+output: 
+     html_document: 
+          keep_md: true
+---
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+### Processing
+I began by downloading the [training data](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv) and [testing data](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv). Upon inspecting these files, it became apparent that some entries would need to be corrected to NA values:
+
+```{r}
+training <- read.csv("pml-training.csv", na.strings=c("#DIV/0!", "NA", ""))
+testing <- read.csv("pml-testing.csv")
+```
+Much of this data does is either blank and will need to be removed. Our features will be each column which is not NA and represents a measure from a device.
+```{r}
+measures <- colnames(training[colSums(is.na(training))==0])
+measures
+training <- training[measures]
+testing <- testing[measures[measures!='classe']]
+```
+
+#### Cross Validation
+```{r}
+library(caret)
+
+set.seed(916)
+inTrain <- createDataPartition(training$classe, p=.7, list=F)
+
+training.train <- training[inTrain,]
+training.test <- training[-inTrain,]
+```
+Use Random Forest to create a model based on the training.train dataset and test its fit.
+```{r}
+library(randomForest)
+modFit <- train(classe ~ ., data=training.train, tuneGrid=data.frame(mtry=3),                                trControl=trainControl(method="none")  
+                       )
+```
+Now test model accuracy
+```{r}
+pred <- predict(modFit, training.test)
+```
+Based on the following confusion matrix, it would appear we have a very accurate model.
+```{r}
+confusionMatrix(pred, training.test$classe)
+```
+The .999 Kappa value represents the out-of-sample error.
+
+### Conlcusion
+Based on the accuracy of this model, I fear that some overfitting may have occurred, but I will use the provided code to generate the files and upload them to test my theory.
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+answers <- predict(modFit, testing)
+
+answers
+
+pml_write_files(answers)
+```
+After submitting each problem and getting the answer correct for all 20, I am forced to conclude that overfitting did not occur and the model fits well enough to accurately predict the test dataset.
